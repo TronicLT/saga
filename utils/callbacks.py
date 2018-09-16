@@ -1,8 +1,8 @@
 # coding=utf8
 from collections import OrderedDict
-from torch.nn import Module
 from datetime import datetime
 
+from torch.nn import Module
 
 __author__ = 'Todani Luvhengo'
 __email__ = 'todani.uml@gmail.com'
