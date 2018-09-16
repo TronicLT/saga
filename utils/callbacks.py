@@ -9,7 +9,8 @@ __email__ = 'todani.uml@gmail.com'
 
 __all__ = [
     'Callback',
-    'Callbacks'
+    'Callbacks',
+    'History'
 ]
 
 
@@ -158,4 +159,20 @@ class Callback(object):
 
 
 class History(Callback):
-    pass
+    """Callback that records events into a `History` object.
+    """
+    def __init__(self):
+        super(History, self).__init__()
+        self.epoch = list()
+        self.history = dict()
+
+    def on_train_begin(self, logs=None):
+        self.epoch = list()
+        self.history = dict()
+
+    def on_epoch_end(self, epoch, logs=None):
+        logs = logs or dict()
+        self.epoch.append(epoch)
+        for k, v in logs.items():
+            self.history.setdefault(k, []).append(v)
+
