@@ -42,12 +42,12 @@ class ArrayDataset(Dataset):
     >>> for i in range(2):
     ...    u, v = data[i]
     ...    print(u, v)  # doctest: +ELLIPSIS
-    [0 1] 0
-    [2 3] 1
+    [0. 1.] 0
+    [2. 3.] 1
 
     """
     def __init__(self, X, y=None, transform=None, target_transform=None, is_image=False):
-        self.X = X
+        self.X = X.astype('float32')
         self.y = y
         self.is_image = False
         self.transform = transform
