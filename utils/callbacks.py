@@ -3,6 +3,7 @@ from collections import OrderedDict
 from datetime import datetime
 
 from torch.nn import Module
+from tqdm import tqdm
 
 __author__ = 'Todani Luvhengo'
 __email__ = 'todani.uml@gmail.com'
@@ -10,7 +11,8 @@ __email__ = 'todani.uml@gmail.com'
 __all__ = [
     'Callback',
     'Callbacks',
-    'History'
+    'History',
+    'ProgressBar'
 ]
 
 
@@ -156,6 +158,45 @@ class Callback(object):
 
     def on_train_end(self, logs=None):
         pass
+
+
+class ProgressBar(Callback):
+    """Progress bar based on tqdm package
+
+    Prints out model training or evaluation progress
+
+    """
+    def __init__(self):
+        super(ProgressBar, self).__init__()
+        self.progbar_ = None
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        # make sure the dbconnection gets closed
+        if self.progbar_ is not None:
+            self.progbar_.close()
+
+    def on_train_begin(self, logs=None):
+        self.logs_ = logs
+
+    def on_epoch_begin(self, epoch, logs=None):
+        try:
+            self.progbar_ = tqdm(total=self.logs_['n_batches'], unit=' batches')
+            self.progbar_.set_description('Epoch {0:04d}/{1:04d}'.format(epoch, self.logs_['n_epoch']))
+        except Exception as e:
+            print(e)
+
+    def on_batch_begin(self, batch, logs=None):
+        self.progbar_.update(1)
+
+    def on_batch_end(self, batch, logs=None):
+        log_data = {key: '%.02e' % value for key, value in logs.items() if 'loss' in key}
+        for k, v in logs.items():
+            if k.endswith('metric'):
+                log_data[k.split('_metric')[0]] = '%.02f' % v
+        self.progbar_.set_postfix(log_data)
 
 
 class History(Callback):
