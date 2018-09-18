@@ -1,14 +1,45 @@
 # coding=utf-8
+import inspect
 from itertools import combinations
-
 
 __author__ = 'Todani Luvhengo'
 __email__ = 'todani.uml@gmail.com'
 
 __all__ = [
     'remove_duplicates',
-    'check_attribute'
+    'check_attribute',
+    'filter_function_params'
 ]
+
+
+def filter_function_params(fn, params, **kwargs):
+    """ Filter params and return those in fn's arguments
+
+    Parameters
+    ----------
+    fn : callable
+        The function used to inspect the
+
+    params : dict
+        A key, value dictionary to compare against `fn`
+
+    Returns
+    ---------
+    Output : dict
+        Contains parameters in both sk_params and fn's arguments.
+    """
+    res = dict()
+    fn_args = inspect.getfullargspec(fn)[0]
+
+    for name, value in kwargs.items():
+        if name in fn_args:
+            res.update({name: value})
+
+    for name, value in params.items():
+        if name in fn_args:
+            res.update({name: value})
+
+    return res
 
 
 def remove_duplicates(obj):
