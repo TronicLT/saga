@@ -1,12 +1,14 @@
 # coding=utf-8
+from __future__ import absolute_import
+
 import torch
 import torch.nn as nn
 from torch.utils import data
 
-from data.datasets import ArrayDataset
-from utils.callbacks import Callback, History, ProgressBar, Callbacks
-from utils.general_utils import check_attribute
-from utils.torch_utils import get_optimiser
+from saga.data.datasets import ArrayDataset
+from saga.utils.callbacks import Callback, History, ProgressBar, Callbacks
+from saga.utils.general_utils import check_attribute
+from saga.utils.torch_utils import get_optimiser
 
 __all__ = [
     'ModelTrainer'

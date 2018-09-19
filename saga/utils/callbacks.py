@@ -198,6 +198,10 @@ class ProgressBar(Callback):
                 log_data[k.split('_metric')[0]] = '%.02f' % v
         self.progbar_.set_postfix(log_data)
 
+    def on_epoch_end(self, epoch, logs=None):
+        # self.progbar_.update()
+        self.progbar_.close()
+
 
 class History(Callback):
     """Callback that records events into a `History` object.

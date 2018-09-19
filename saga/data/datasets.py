@@ -1,7 +1,7 @@
 # coding=utf-8
 import numpy as np
-from torch.utils.data import Dataset
 from PIL import Image
+from torch.utils.data import Dataset
 
 __author__ = 'Todani Luvhengo'
 __email__ = 'todani.uml@gmail.com'

@@ -1,6 +1,5 @@
 # coding=utf8
 from torch import optim
-from torch.utils.data import Dataset
 
 __author__ = 'Todani Luvhengo'
 __email__ = 'todani.uml@gmail.com'
