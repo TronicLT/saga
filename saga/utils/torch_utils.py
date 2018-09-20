@@ -7,7 +7,8 @@ __email__ = 'todani.uml@gmail.com'
 
 __all__ = [
     'get_optimiser',
-    'get_loss'
+    'get_loss',
+    'incremental_mean'
 ]
 
 
@@ -68,3 +69,38 @@ def get_optimiser(optimiser, params, **kwargs):
         raise ValueError('Invalid optimiser input')
 
 
+def incremental_mean(x1, x2):
+    """ Incremental mean of means taken on different samples
+
+    Parameters
+    ----------
+    x1: An iterable, shape=(2,)
+        Contains the size, mean statistics of one sample
+
+    x2: iterable, shape=(2,)
+        Contains the size, mean statistics of one sample
+
+    Examples
+    --------
+    >>> import numpy as np
+    >>> x = np.random.rand(10)
+    >>> m1 = x.mean()
+    >>> _, m2 = incremental_mean((2, x[:2].mean()), (8, x[2:].mean()))
+    >>> np.allclose(m1, m2, 1e-8)
+    True
+    >>> import torch
+    >>> x = torch.randn(10)
+    >>> m1 = x.mean()
+    >>> _, m2 = incremental_mean((2, x[:2].mean()), (8, x[2:].mean()))
+    >>> np.allclose(m1.numpy(), m2.numpy(), 1e-7)
+    True
+
+    Returns
+    -------
+    iterable, sample size and mean
+    """
+    n_a, mean_a = x1
+    n_b, mean_b = x2
+    n_ab = n_a + n_b  # Total samples
+    mean_ab = ((mean_a * n_a) + (mean_b * n_b)) / n_ab  # Averaged mean
+    return n_ab, mean_ab
