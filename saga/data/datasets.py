@@ -8,7 +8,7 @@ __email__ = 'todani.uml@gmail.com'
 
 __all__ = [
     'ArrayDataset',
-    'check_array_data_samples'
+    'check_num_samples'
 ]
 
 
@@ -52,7 +52,7 @@ class ArrayDataset(Dataset):
         self.is_image = False
         self.transform = transform
         self.target_transform = target_transform
-        self.n_samples = check_array_data_samples(X, y)
+        self.n_samples = check_num_samples(X, y)
         self.has_target = False if y is None else True
 
     def __transform(self, x, y):
@@ -77,7 +77,7 @@ class ArrayDataset(Dataset):
         return self.n_samples
 
 
-def check_array_data_samples(X, y=None):
+def check_num_samples(X, y=None):
     """ Array samples validation
 
     Parameters
