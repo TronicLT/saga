@@ -8,7 +8,8 @@ __email__ = 'todani.uml@gmail.com'
 __all__ = [
     'get_optimiser',
     'get_loss',
-    'incremental_mean'
+    'incremental_mean',
+    'moving_average'
 ]
 
 
@@ -104,3 +105,24 @@ def incremental_mean(x1, x2):
     n_ab = n_a + n_b  # Total samples
     mean_ab = ((mean_a * n_a) + (mean_b * n_b)) / n_ab  # Averaged mean
     return n_ab, mean_ab
+
+
+def moving_average(x, val, alpha=0.9):
+    """ Compute moving average
+
+    Parameters
+    ----------
+    x : Tensor, array-like, int or float
+        Moving average value
+
+    val : Tensor, array-like, int or float
+        New avarage value
+
+    alpha : float
+        Smoothing factor
+
+    Returns
+    -------
+    Tensor, array-like, int or float
+    """
+    return x * alpha + (1. - alpha) * val
