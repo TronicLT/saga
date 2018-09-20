@@ -184,7 +184,7 @@ class ProgressBar(Callback):
     def on_epoch_begin(self, epoch, logs=None):
         try:
             self.progbar_ = tqdm(total=self.logs_['n_batches'], unit=' batches')
-            self.progbar_.set_description('Epoch {0:04d}/{1:04d}'.format(epoch, self.logs_['n_epoch']))
+            self.progbar_.set_description('Epoch {0:03d}/{1:03d}'.format(epoch, self.logs_['n_epoch']))
         except Exception as e:
             print(e)
 
