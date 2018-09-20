@@ -18,8 +18,16 @@ def get_loss(loss):
 
     Parameters
     ----------
-    loss : str
+    loss : str or callable
         Model loss
+
+    Examples
+    --------
+    >>> a = func.cross_entropy
+    >>> get_loss(a) is a
+    True
+    >>> 'nll_loss' in get_loss('nll_loss').__str__()
+    True
 
     Returns
     -------
