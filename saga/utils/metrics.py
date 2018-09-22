@@ -15,6 +15,9 @@ __all__ = [
     'binary_cross_entropy',
     'bce',
     'BinaryCrossEntropy',
+    'mean_squared_error',
+    'mse',
+    'MSE',
     'check_metric'
 ]
 
@@ -219,6 +222,47 @@ class BinaryCrossEntropy(Metric):
         return 'bce'
 
 
+class MSE(Metric):
+    """Mean squared error between `n` elements in the input `x` and target `y`.
+
+        Parameters
+    ----------
+    weight : Tensor, (optional)
+        a manual rescaling weight given to the loss of each batch element.
+        If given, has to be a Tensor of size "nbatch".
+
+    reduction : str (optional)
+        Specifies the reduction to apply to the output: `none` | `elementwise_mean` | `sum`.
+        'none': no reduction will be applied,
+        'elementwise_mean': the sum of the output will be divided by the number of
+            elements in the output,
+        'sum': the output will be summed.
+
+    Examples
+    --------
+    >>> input = torch.ones(3) *2
+    >>> target = torch.ones(3)
+    >>> mse = MSE(reduction='sum')
+    >>> mse(input, target)
+    tensor(3.)
+    >>> mse.name
+    'mse'
+    """
+    def forward(self, y_pred, y_true):
+        if self.weight is None:
+            return func.mse_loss(y_pred, y_true, reduction=self.reduction)
+        else:
+            score = func.mse_loss(y_pred, y_true, None)
+            score = score * self.weight
+            if self.reduction.lower() == 'none':
+                return score.float()
+            elif self.reduction.lower() == 'sum':
+                return score.float().sum()
+            else:
+                return score.float().sum() / len(score)
+
+
+mse = mean_squared_error = MSE
 bce = binary_cross_entropy = BinaryCrossEntropy
 nll = cross_entropy = NLL
 acc = accuracy = Accuracy
