@@ -258,6 +258,7 @@ class ModelTrainer(object):
                     self.optimiser_.step()
                     # ----------------------------------------------------------------
                     batch_logs['loss'] = loss.item()
+                    batch_logs['size'] = len(x_batch)
                     callback_container.on_batch_end(idx_batch, batch_logs)
 
                 if validate:
@@ -336,9 +337,9 @@ def __example():
     model = Net()
     trainer = ModelTrainer(model)
     trainer.compile(nll_loss, metrics=['acc'])
-    hist = trainer.fit(X, y, val_data=(X, y), shuffle=True, batch_size=8)
+    history = trainer.fit(X, y, val_data=(X, y), shuffle=True, batch_size=8)
     acc = trainer.evaluate(X, y, 200)
-    print(hist.history)
+    print(history.epoch_history)
 
 
 if __name__ == '__main__':

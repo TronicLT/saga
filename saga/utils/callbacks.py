@@ -2,6 +2,7 @@
 from collections import OrderedDict
 from datetime import datetime
 
+import pandas
 from torch.nn import Module
 from tqdm import tqdm
 
@@ -211,19 +212,37 @@ class ProgressBar(Callback):
 class History(Callback):
     """Callback that records events into a `History` object.
     """
-    def __init__(self):
+    def __init__(self, save_dir=None):
         super(History, self).__init__()
-        self.epoch = list()
-        self.history = dict()
+        self.seen = 0
+        self.steps = 0
+        self.save_dir = save_dir
+        self.epoch_history = None
+        self.bach_history = None
 
     def on_train_begin(self, logs=None):
-        self.epoch = list()
-        self.history = dict()
+        self.epoch_history = pandas.DataFrame()
+        self.bach_history = pandas.DataFrame()
+
+    def on_batch_end(self, batch, logs=None):
+        logs = logs or dict()
+        self.steps += 1
+        self.seen += logs.get('size', 0)
+        tmp = dict(step=self.steps, seen=self.seen)
+        for k, v in logs.items():
+            k = k.split('_metric')[0] if '_metric' in k else k
+            tmp[k] = v
+        self.bach_history = self.bach_history.append(tmp, ignore_index=True)
 
     def on_epoch_end(self, epoch, logs=None):
         logs = logs or dict()
-        self.epoch.append(epoch)
+        tmp = dict(epoch=epoch, seen=self.seen, step=self.steps)
         for k, v in logs.items():
             k = k.split('_metric')[0] if '_metric' in k else k
-            self.history.setdefault(k, []).append(v)
+            tmp[k] = v
+        self.epoch_history = self.epoch_history.append(tmp, ignore_index=True)
 
+    def on_train_end(self, logs=None):
+        if self.save_dir:
+            self.epoch_history.to_csv(self.save_dir + '/epoch_history.csv', index=False)
+            self.bach_history.to_csv(self.save_dir + '/bach_history.csv', index=False)
