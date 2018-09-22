@@ -195,10 +195,15 @@ class ProgressBar(Callback):
         log_data = {key: '%.02e' % value for key, value in logs.items() if 'loss' in key}
         for k, v in logs.items():
             if k.endswith('metric'):
-                log_data[k.split('_metric')[0]] = '%.02f' % v
+                log_data[k.split('_metric')[0]] = '{0:.02e}'.format(v)
         self.progbar_.set_postfix(log_data)
 
     def on_epoch_end(self, epoch, logs=None):
+        log_data = {key: '%.02e' % value for key, value in logs.items() if 'loss' in key}
+        for k, v in logs.items():
+            if k.endswith('metric'):
+                log_data[k.split('_metric')[0]] = '{0:.02e}'.format(v)
+        self.progbar_.set_postfix(log_data)
         # self.progbar_.update()
         self.progbar_.close()
 
@@ -219,5 +224,6 @@ class History(Callback):
         logs = logs or dict()
         self.epoch.append(epoch)
         for k, v in logs.items():
+            k = k.split('_metric')[0] if '_metric' in k else k
             self.history.setdefault(k, []).append(v)
 
