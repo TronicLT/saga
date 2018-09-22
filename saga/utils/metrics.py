@@ -8,8 +8,32 @@ __email__ = 'todani.uml@gmail.com'
 __all__ = [
     'Metric',
     'NLL',
-    'nll'
+    'nll',
+    'Accuracy',
+    'acc',
+    'accuracy',
+    'check_metric'
 ]
+
+
+def check_metric(metric, **kwargs):
+    """ Get metric
+
+    Parameters
+    ----------
+    metric: An `Metric` or a string object, (Default: 'Adam')
+        Defines the metric for evaluating a learning model.
+
+    Returns
+    -------
+    An `optimisation.Optimiser` object
+    """
+    if isinstance(metric, str):
+        return globals()[metric](**kwargs)
+    else:
+        if not isinstance(metric, Metric):
+            raise TypeError("Metric function should be an instance Metric. Got {0}".format(metric))
+        return metric
 
 
 class Metric(object):
@@ -85,4 +109,65 @@ class NLL(Metric):
         func.nll_loss(y_pred, y_true, weight=self.weight, reduction=self.reduction)
 
 
-nll = NLL()
+class Accuracy(Metric):
+    """Accuracy classification score.
+
+    In multilabel classification, this function computes subset accuracy
+
+    Parameters
+    ----------
+    top_k: int, optional (default = 1)
+        Number of classes to consider when computing the error. Should be in the
+        the range in the (1, C),, where C is the number of classes.
+
+    reduction : str (optional)
+        Specifies the reduction to apply to the output: `none` | `elementwise_mean` | `sum`.
+        'none': no reduction will be applied,
+        'elementwise_mean': the sum of the output will be divided by the number of
+            elements in the output,
+        'sum': the output will be summed.
+
+    Examples
+    --------
+    >>> import numpy as np
+    >>> from sklearn.metrics import accuracy_score
+    >>> y_pred = np.array([0, 2, 1, 3])
+    >>> y_true = np.array([0, 1, 2, 3])
+    >>> accuracy_score(y_true, y_pred)
+    0.5
+    >>> accuracy_score(np.array([[0, 1], [1, 1]]), np.ones((2, 2)))
+    0.5
+    >>> acc = Accuracy()
+    >>> acc(torch.from_numpy(y_pred), torch.from_numpy(y_true)).numpy()
+    array(0.5, dtype=float32)
+    >>> acc(torch.from_numpy(np.array([[0, 1], [1, 1]])), torch.ones((2, 2))).numpy()
+    array(0.5, dtype=float32)
+    """
+    def __init__(self, top_k=1, reduction='elementwise_mean'):
+        super(Accuracy, self).__init__(reduction=reduction)
+        self.top_k = top_k
+
+    def forward(self, y_pred, y_true):
+        if y_pred.dim() == y_true.dim() == 1:
+            score = y_pred.eq(y_true)
+        else:
+            if y_pred.dim() == y_true.dim() == 2:
+                y_true = torch.argmax(y_true, -1)
+
+            # TODO: Implement top-k accuracy
+            score = torch.argmax(y_pred, dim=-1).eq(y_true)
+
+        if self.reduction.lower() == 'none':
+            return score.float()
+        elif self.reduction.lower() == 'sum':
+            return score.float().sum()
+        else:
+            return score.float().sum() / len(score)
+
+    @property
+    def name(self):
+        return 'acc'
+
+
+nll = NLL
+acc = accuracy = Accuracy
