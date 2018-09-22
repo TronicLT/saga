@@ -8,7 +8,7 @@ from saga.data.datasets import ArrayDataset
 from saga.utils.callbacks import Callback, History, ProgressBar, Callbacks
 from saga.utils.general_utils import check_attribute
 from saga.utils.metrics import check_metric
-from saga.utils.torch_utils import check_optimiser, check_loss
+from saga.utils.torch_utils import check_optimiser, check_loss, moving_average
 
 __all__ = [
     'ModelTrainer'
@@ -65,6 +65,7 @@ class ModelTrainer(object):
         if isinstance(device, str):
             device = torch.device(device)
         self.device_ = device
+        self.model.to(self.device_)
 
     @property
     def history(self):
@@ -109,9 +110,11 @@ class ModelTrainer(object):
 
     def set_metrics(self, metrics):
         metrics = metrics or list()
-        self.metrics_ = list()
+        self.metrics_ = [self.loss]
+        self.metrics_names_ = ['loss']
         for metric in metrics:
             self.metrics_.append(check_metric(metric))
+            self.metrics_names_.append(self.metrics_[-1].name)
 
     def set_optimizer(self, optimizer, **kwargs):
         if 'parameters' in kwargs:
@@ -219,9 +222,6 @@ class ModelTrainer(object):
         callbacks = callbacks or list()
         self.set_callbacks(callbacks)
         # --------------------------------------------------
-        self.model.to(self.device)
-
-        # --------------------------------------------------
         data_loader = self.__get_data_loader(X, y, batch_size=batch_size, shuffle=shuffle, num_workers=n_workers)
         if isinstance(val_data, (list, tuple)):
             x_val, y_val = val_data
@@ -238,12 +238,11 @@ class ModelTrainer(object):
                                                'n_batches': len(data_loader),
                                                'n_epoch': n_epoch})
 
+            batch_logs, epoch_logs = dict(), dict()
             for idx_epoch in range(1, n_epoch + 1):
                 self.model.train(True)
-                epoch_logs = dict()
                 callback_container.on_epoch_begin(idx_epoch, epoch_logs)
-
-                batch_logs = dict()
+                # --------------------------------------------------------------------
                 for idx_batch, (x_batch, y_batch) in enumerate(data_loader, start=1):
                     callback_container.on_batch_begin(idx_batch, batch_logs)
                     # ----------------------------------------------------------------
@@ -256,18 +255,28 @@ class ModelTrainer(object):
                     loss = self.loss_(y_pred, y_batch, **self.loss_kwargs_)
                     loss.backward()
                     self.optimiser_.step()
+                    # --------------------------------------------------------------------
+                    outs = self.evaluate_tensor(x_batch, y_batch)
+                    outs = outs if isinstance(outs, (tuple, list)) else [outs]
+                    for out, name in zip(outs[1:], self.metrics_names_[1:]):
+                        batch_logs[name + '_metric'] = moving_average(batch_logs.get(name + '_metric', 0.), out)
                     # ----------------------------------------------------------------
                     batch_logs['loss'] = loss.item()
                     batch_logs['size'] = len(x_batch)
                     callback_container.on_batch_end(idx_batch, batch_logs)
-
+                # --------------------------------------------------------------------
+                # TODO: Add metric aggregation callback
+                for key in batch_logs:
+                    if 'loss' == key or key.endswith('_metric'):
+                        epoch_logs[key] = batch_logs[key]
+                # --------------------------------------------------------------------
                 if validate:
                     val_outs = self.evaluate(x_val, y_val, 2*batch_size)
                     val_outs = val_outs if isinstance(val_outs, (tuple, list)) else [val_outs]
-                    for out, met in zip(val_outs, self.metrics):
-                        epoch_logs['val_' + met.name + '_metric'] = out
+                    for out, name in zip(val_outs, self.metrics_names_):
+                        epoch_logs['val_' + name + '_metric'] = out
+                # ---------------------------------------------------------------------
 
-                epoch_logs['loss'] = loss.item() or np.inf
                 callback_container.on_epoch_end(idx_epoch, epoch_logs)
 
         self.model.train(mode=False)
@@ -311,16 +320,31 @@ class ModelTrainer(object):
         """
         self.model.eval()
         x_res = list()
-        for batch in generator:
-            if isinstance(batch, (list, tuple)):
-                with torch.no_grad():
+        with torch.no_grad():
+            for batch in generator:
+                if isinstance(batch, (list, tuple)):
                     x_res.append(self.model.forward(batch[0].to(self.device)))
-            else:
-                with torch.no_grad():
+                else:
                     x_res.append(self.model.forward(batch.to(self.device)))
 
         x_res = torch.cat(x_res, 0)
         return x_res if as_tensor else x_res.cpu().numpy()
+
+    def predict_tensor(self, x):
+        """ Run model inference on tensor
+
+        Parameters
+        ----------
+        x : 'torch.tensor` shape=(n_samples, ...)
+            Predictor variable
+
+        Returns
+        -------
+        `torch.tensor`
+        """
+        self.model.eval()
+        with torch.no_grad():
+            return self.model.forward(x.to(self.device))
 
     def evaluate(self, x, y, batch_size=32):
         """ Evaluate the model on data `x` and `y`
@@ -357,14 +381,36 @@ class ModelTrainer(object):
         """
         self.model.eval()
         x_res, y_res = list(), list()
-        for x_bach, y_batch in generator:
-            with torch.no_grad():
+        with torch.no_grad():
+            for x_bach, y_batch in generator:
                 x_res.append(self.model.forward(x_bach.to(self.device)))
                 y_res.append(y_batch.to(self.device))
+
         x_res = torch.cat(x_res, 0)
         y_res = torch.cat(y_res, 0)
         res = [met(x_res, y_res).item() for met in self.metrics_]
         return res[0] if len(res) == 1 else res
+
+    def evaluate_tensor(self, x, y):
+        """ Evaluate model using on tensor
+
+        Parameters
+        ----------
+        x : 'torch.tensor` shape=(n_samples, ...)
+            Predictor variable
+
+        y : `torch.tensor`, shape=(n_samples, ...)
+            Dependent variables
+
+        Returns
+        -------
+        `torch.tensor`
+        """
+        self.model.eval()
+        with torch.no_grad():
+            y_pred = self.model.forward(x.to(self.device))
+            res = [met(y_pred, y.to(self.device)).item() for met in self.metrics_]
+            return res[0] if len(res) == 1 else res
 
 
 def __example():
@@ -386,10 +432,10 @@ def __example():
     model = Net()
     trainer = ModelTrainer(model)
     trainer.compile(cross_entropy, metrics=['acc'])
-    history = trainer.fit(X, y, val_data=(X, y), shuffle=True, batch_size=8, n_epoch=20)
+    history = trainer.fit(X, y, val_data=(X, y), shuffle=True, batch_size=10, n_epoch=20)
     acc = trainer.evaluate(X, y, 200)
     y_pred = trainer.predict(X)
-    print(history.epoch_history)
+    print(history.bach_history)
 
 
 if __name__ == '__main__':

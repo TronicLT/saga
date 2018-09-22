@@ -193,14 +193,14 @@ class ProgressBar(Callback):
         self.progbar_.update(1)
 
     def on_batch_end(self, batch, logs=None):
-        log_data = {key: '%.02e' % value for key, value in logs.items() if 'loss' in key}
+        log_data = {key: '%.02e' % value for key, value in logs.items() if 'loss' == key}
         for k, v in logs.items():
             if k.endswith('metric'):
                 log_data[k.split('_metric')[0]] = '{0:.02e}'.format(v)
         self.progbar_.set_postfix(log_data)
 
     def on_epoch_end(self, epoch, logs=None):
-        log_data = {key: '%.02e' % value for key, value in logs.items() if 'loss' in key}
+        log_data = {key: '%.02e' % value for key, value in logs.items() if 'loss' == key}
         for k, v in logs.items():
             if k.endswith('metric'):
                 log_data[k.split('_metric')[0]] = '{0:.02e}'.format(v)
