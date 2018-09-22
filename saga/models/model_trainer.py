@@ -161,7 +161,7 @@ class ModelTrainer(object):
                                num_workers=num_workers)
 
     @staticmethod
-    def __validation_loader(x, y, batch_size=32, num_workers=0):
+    def __validation_loader(x, y=None, batch_size=32, num_workers=0):
         return data.DataLoader(ArrayDataset(x, y),
                                batch_size=batch_size,
                                shuffle=False,
@@ -273,6 +273,55 @@ class ModelTrainer(object):
         self.model.train(mode=False)
         return self.history_
 
+    def predict(self, x, batch_size=32, as_tensor=False):
+        """ Run model inference on `x`
+
+        Parameters
+        ----------
+        x : array-like, shape=(n_samples, ...)
+            Predictor variable
+
+        batch_size : int
+            The number of samples to use per prediction call
+
+        as_tensor : bool
+            If `True` the result is a `torch.tensor` otherwise an `array-like` object is returned
+
+        Returns
+        -------
+        array-like or `torch.tensor`
+        """
+        generator = self.__validation_loader(x, batch_size=batch_size, num_workers=2)
+        return self.predict_generator(generator=generator, as_tensor=as_tensor)
+
+    def predict_generator(self, generator, as_tensor=False):
+        """ Run model inference on generator
+
+        Parameters
+        ----------
+        generator : `torch.data.DataLoader` or generator
+            Generator loader yielding predictors or tuples (predictors, dependent).
+
+        as_tensor : bool
+            If `True` the result is a `torch.tensor` otherwise an `array-like` object is returned
+
+        Returns
+        -------
+        array-like or `torch.tensor`
+        """
+        self.model.eval()
+        x_res = list()
+        for batch in generator:
+            if isinstance(batch, (list, tuple)):
+                with torch.no_grad():
+                    x_res.append(self.model.forward(batch[0].to(self.device)))
+            else:
+                with torch.no_grad():
+                    x_res.append(self.model.forward(batch.to(self.device)))
+
+        x_res = torch.cat(x_res, 0)
+        return x_res if as_tensor else x_res.cpu().numpy()
+
     def evaluate(self, x, y, batch_size=32):
         """ Evaluate the model on data `x` and `y`
 
@@ -291,7 +340,6 @@ class ModelTrainer(object):
         -------
         array-like
         """
-        self.model.eval()
         generator = self.__validation_loader(x, y, batch_size, num_workers=2)
         return self.evaluate_generator(generator=generator)
 
@@ -307,6 +355,7 @@ class ModelTrainer(object):
         -------
         array-like
         """
+        self.model.eval()
         x_res, y_res = list(), list()
         for x_bach, y_batch in generator:
             with torch.no_grad():
@@ -320,7 +369,7 @@ class ModelTrainer(object):
 
 def __example():
     from sklearn.datasets import load_iris
-    from torch.nn.functional import nll_loss, relu, log_softmax
+    from torch.nn.functional import nll_loss, relu, log_softmax, cross_entropy
     X, y = load_iris(True)
 
     class Net(nn.Module):
@@ -336,9 +385,10 @@ def __example():
 
     model = Net()
     trainer = ModelTrainer(model)
-    trainer.compile(nll_loss, metrics=['acc'])
-    history = trainer.fit(X, y, val_data=(X, y), shuffle=True, batch_size=8)
+    trainer.compile(cross_entropy, metrics=['acc'])
+    history = trainer.fit(X, y, val_data=(X, y), shuffle=True, batch_size=8, n_epoch=20)
     acc = trainer.evaluate(X, y, 200)
+    y_pred = trainer.predict(X)
     print(history.epoch_history)
 
 
