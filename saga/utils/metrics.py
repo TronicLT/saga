@@ -18,6 +18,9 @@ __all__ = [
     'mean_squared_error',
     'mse',
     'MSE',
+    'RMSE',
+    'rmse',
+    'root_mean_squared_error',
     'check_metric'
 ]
 
@@ -262,6 +265,41 @@ class MSE(Metric):
                 return score.float().sum() / len(score)
 
 
+class RMSE(Metric):
+    """ Root Mean squared error between `n` elements in the input `x` and target `y`.
+
+        Parameters
+    ----------
+    weight : Tensor, (optional)
+        a manual rescaling weight given to the loss of each batch element.
+        If given, has to be a Tensor of size "nbatch".
+
+    reduction : str (optional)
+        Specifies the reduction to apply to the output: `none` | `elementwise_mean` | `sum`.
+        'none': no reduction will be applied,
+        'elementwise_mean': the sum of the output will be divided by the number of
+            elements in the output,
+        'sum': the output will be summed.
+
+    Examples
+    --------
+    >>> input = torch.ones(4) *2
+    >>> target = torch.ones(4)
+    >>> rmse = RMSE(reduction='sum')
+    >>> rmse(input, target)
+    tensor(2.)
+    >>> rmse.name
+    'rmse'
+    """
+    def __init__(self, weight=None, reduction='elementwise-mean'):
+        super(RMSE, self).__init__(weight, reduction)
+        self.mse = MSE(weight, reduction)
+
+    def forward(self, y_pred, y_true):
+        return torch.sqrt(self.mse(y_pred, y_true))
+
+
+rmse = root_mean_squared_error = RMSE
 mse = mean_squared_error = MSE
 bce = binary_cross_entropy = BinaryCrossEntropy
 nll = cross_entropy = NLL
