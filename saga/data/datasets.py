@@ -44,7 +44,13 @@ class ArrayDataset(Dataset):
     ...    print(u, v)  # doctest: +ELLIPSIS
     [0. 1.] 0
     [2. 3.] 1
-
+    >>> data = ArrayDataset(X)
+    >>> assert len(data) == 2
+    >>> for i in range(2):
+    ...    u = data[i]
+    ...    print(u)  # doctest: +ELLIPSIS
+    [0. 1.]
+    [2. 3.]
     """
     def __init__(self, X, y=None, transform=None, target_transform=None, is_image=False):
         self.X = X.astype('float32')
@@ -65,7 +71,10 @@ class ArrayDataset(Dataset):
         if self.target_transform is not None and self.has_target:
             y = self.target_transform(y)
 
-        return x, y
+        if self.has_target:
+            return x, y
+        else:
+            return x
 
     def __getitem__(self, index):
         if self.has_target:
