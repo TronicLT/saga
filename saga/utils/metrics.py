@@ -12,6 +12,9 @@ __all__ = [
     'Accuracy',
     'acc',
     'accuracy',
+    'binary_cross_entropy',
+    'bce',
+    'BinaryCrossEntropy',
     'check_metric'
 ]
 
@@ -43,7 +46,7 @@ class Metric(object):
     Parameters
     ----------
     weight : Tensor (optional)
-        A manual rescaling weight given to each class.
+        A manual rescaling weight for each example.
         If given, it has to be a Tensor of size `C`. Otherwise, it is treated as if having all ones.
 
     reduction : str (optional)
@@ -91,6 +94,19 @@ class NLL(Metric):
 
     The target that this loss expects is a class index
     `(0 to C-1, where C = number of classes)`
+
+    Parameters
+    ----------
+    weight : Tensor (optional)
+        A manual rescaling weight for each class.
+        If given, it has to be a Tensor of size `C`. Otherwise, it is treated as if having all ones.
+
+    reduction : str (optional)
+        Specifies the reduction to apply to the output: `none` | `elementwise_mean` | `sum`.
+        'none': no reduction will be applied,
+        'elementwise_mean': the sum of the output will be divided by the number of
+            elements in the output,
+        'sum': the output will be summed.
 
     Examples
     --------
@@ -169,5 +185,40 @@ class Accuracy(Metric):
         return 'acc'
 
 
-nll = NLL
+class BinaryCrossEntropy(Metric):
+    """Binary Cross Entropy
+    Measures the binary cross-entropy between the target and the output. `targets` should be between [0 1]
+
+    Parameters
+    ----------
+    weight : Tensor, (optional)
+        a manual rescaling weight given to the loss of each batch element.
+        If given, has to be a Tensor of size "nbatch".
+
+    reduction : str (optional)
+        Specifies the reduction to apply to the output: `none` | `elementwise_mean` | `sum`.
+        'none': no reduction will be applied,
+        'elementwise_mean': the sum of the output will be divided by the number of
+            elements in the output,
+        'sum': the output will be summed.
+
+    Examples
+    --------
+    >>> input = torch.randn(3, requires_grad=True)
+    >>> target = torch.empty(3).random_(2)
+    >>> bce = BinaryCrossEntropy(reduction='sum')
+    >>> score = bce(torch.sigmoid(input), target)
+    >>> bce.name
+    'bce'
+    """
+    def forward(self, y_pred, y_true):
+        return func.binary_cross_entropy(y_pred, y_true, self.weight, reduction=self.reduction)
+
+    @property
+    def name(self):
+        return 'bce'
+
+
+bce = binary_cross_entropy = BinaryCrossEntropy
+nll = cross_entropy = NLL
 acc = accuracy = Accuracy
