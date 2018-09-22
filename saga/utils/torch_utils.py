@@ -6,14 +6,14 @@ __author__ = 'Todani Luvhengo'
 __email__ = 'todani.uml@gmail.com'
 
 __all__ = [
-    'get_optimiser',
-    'get_loss',
+    'check_optimiser',
+    'check_loss',
     'incremental_mean',
     'moving_average'
 ]
 
 
-def get_loss(loss):
+def check_loss(loss):
     """ Get torch loss
 
     Parameters
@@ -24,9 +24,9 @@ def get_loss(loss):
     Examples
     --------
     >>> a = func.cross_entropy
-    >>> get_loss(a) is a
+    >>> check_loss(a) is a
     True
-    >>> 'nll_loss' in get_loss('nll_loss').__str__()
+    >>> 'nll_loss' in check_loss('nll_loss').__str__()
     True
 
     Returns
@@ -47,7 +47,7 @@ def get_loss(loss):
         raise ValueError('Unknown loss, implement loss and pass aa callable')
 
 
-def get_optimiser(optimiser, params, **kwargs):
+def check_optimiser(optimiser, params, **kwargs):
     """ Get torch optimiser
 
     Parameters
