@@ -1,5 +1,6 @@
 # coding=utf-8
-import numpy as np
+import types
+
 import torch
 import torch.nn as nn
 from torch.utils import data
@@ -171,9 +172,9 @@ class ModelTrainer(object):
                                num_workers=num_workers)
 
     def fit(self,
-            X,
+            x,
             y=None,
-            val_data=None,
+            validation_data=None,
             n_epoch=10,
             batch_size=32,
             callbacks=None,
@@ -184,13 +185,13 @@ class ModelTrainer(object):
 
         Parameters
         ----------
-        X : array-like, shape=(n_samples, ...)
+        x : array-like, shape=(n_samples, ...)
             Predictor variable
 
         y : array-like, shape=(n_samples, ...)
             dependent variables
 
-        val_data : iterable, shape=(2,)
+        validation_data : iterable, shape=(2,)
             Validation data (predictor, dependent variable)
 
         n_epoch : int
@@ -218,15 +219,71 @@ class ModelTrainer(object):
         """
         # --------------------------------------------------
         check_attribute(self, ['optimiser_', 'loss_'], 'Call `compile` function first')
+        generator = self.__get_data_loader(x, y, batch_size=batch_size, shuffle=shuffle, num_workers=n_workers)
+
+        return self.fit_generator(generator,
+                                  validation_data=validation_data,
+                                  n_epoch=n_epoch,
+                                  callbacks=callbacks,
+                                  verbose=verbose)
+
+    def fit_generator(self,
+                      generator,
+                      n_batches=None,
+                      validation_data=None,
+                      n_epoch=10,
+                      callbacks=None,
+                      verbose=1):
+        """ Fit model on generator
+
+        Parameters
+        ----------
+        generator : `torch.utils.data.DataLoader` or types.GeneratorType
+            Generator loader yielding tuples (predictors, dependent) variables
+
+
+        validation_data : iterable, shape=(2,) or `torch.utils.data.DataLoader` or generator
+            Validation data (predictor, dependent variable) or generator yielding (predictor, dependent variable)
+
+        n_batches : int
+            Number of batches per epoch
+
+        n_epoch : int
+            Number of epochs to train the model
+
+        callbacks : iterable
+            An iterable of `utils.callbacks.Callback`
+
+        verbose : int
+            verbosity level
+
+        Returns
+        -------
+        `saga.utils.callbacks.History`
+        """
+        # --------------------------------------------------
+        check_attribute(self, ['optimiser_', 'loss_'], 'Call `compile` function first')
         # --------------------------------------------------
         callbacks = callbacks or list()
         self.set_callbacks(callbacks)
         # --------------------------------------------------
-        data_loader = self.__get_data_loader(X, y, batch_size=batch_size, shuffle=shuffle, num_workers=n_workers)
-        if isinstance(val_data, (list, tuple)):
-            x_val, y_val = val_data
+        if n_batches is None:
+            try:
+                n_batches = len(generator)
+            except ValueError as e:
+                raise ValueError('n_batches  cannot be inferred from generetor. `n_batches=None`. '
+                                 'Please specify `n_batches` or use the `torch.data.DataLoader` class.')
+
+        # --------------------------------------------------
+        if isinstance(validation_data, (list, tuple)):
+            x_val, y_val = validation_data
+            validation_generator = self.__validation_loader(x_val, y_val, batch_size=64)
+            validate = True
+        elif isinstance(validation_data, data.DataLoader) or isinstance(validation_data, types.GeneratorType):
+            validation_generator = validation_data
             validate = True
         else:
+            validation_generator = None
             validate = False
         # ---------------------------------------------------
         with ProgressBar() as p_bar:
@@ -234,16 +291,14 @@ class ModelTrainer(object):
                 self.callbacks_.append(p_bar)
             callback_container = Callbacks(self.callbacks_)
             callback_container.set_model(self.model)
-            callback_container.on_train_begin({'batch_size': batch_size,
-                                               'n_batches': len(data_loader),
-                                               'n_epoch': n_epoch})
-
+            callback_container.on_train_begin({'n_batches': n_batches, 'n_epoch': n_epoch})
+            # --------------------------------------------------------------
             batch_logs, epoch_logs = dict(), dict()
             for idx_epoch in range(1, n_epoch + 1):
                 self.model.train(True)
                 callback_container.on_epoch_begin(idx_epoch, epoch_logs)
                 # --------------------------------------------------------------------
-                for idx_batch, (x_batch, y_batch) in enumerate(data_loader, start=1):
+                for idx_batch, (x_batch, y_batch) in enumerate(generator, start=1):
                     callback_container.on_batch_begin(idx_batch, batch_logs)
                     # ----------------------------------------------------------------
                     x_batch = x_batch.to(self.device)
@@ -270,14 +325,17 @@ class ModelTrainer(object):
                     if 'loss' == key or key.endswith('_metric'):
                         epoch_logs[key] = batch_logs[key]
                 # --------------------------------------------------------------------
-                if validate:
-                    val_outs = self.evaluate(x_val, y_val, 2*batch_size)
+                if validate and validation_generator is not None:
+                    val_outs = self.evaluate_generator(validation_generator)
                     val_outs = val_outs if isinstance(val_outs, (tuple, list)) else [val_outs]
                     for out, name in zip(val_outs, self.metrics_names_):
                         epoch_logs['val_' + name + '_metric'] = out
                 # ---------------------------------------------------------------------
 
                 callback_container.on_epoch_end(idx_epoch, epoch_logs)
+
+            # --------------------------------------------------------------
+            callback_container.on_train_end()
 
         self.model.train(mode=False)
         return self.history_
@@ -300,7 +358,7 @@ class ModelTrainer(object):
         -------
         array-like or `torch.tensor`
         """
-        generator = self.__validation_loader(x, batch_size=batch_size, num_workers=2)
+        generator = self.__validation_loader(x, batch_size=batch_size, num_workers=0)
         return self.predict_generator(generator=generator, as_tensor=as_tensor)
 
     def predict_generator(self, generator, as_tensor=False):
@@ -308,7 +366,7 @@ class ModelTrainer(object):
 
         Parameters
         ----------
-        generator : `torch.data.DataLoader` or generator
+        generator : `torch.utils.data.DataLoader` or types.GeneratorType
             Generator loader yielding predictors or tuples (predictors, dependent).
 
         as_tensor : bool
@@ -364,7 +422,7 @@ class ModelTrainer(object):
         -------
         array-like
         """
-        generator = self.__validation_loader(x, y, batch_size, num_workers=2)
+        generator = self.__validation_loader(x, y, batch_size, num_workers=0)
         return self.evaluate_generator(generator=generator)
 
     def evaluate_generator(self, generator):
@@ -372,7 +430,7 @@ class ModelTrainer(object):
 
         Parameters
         ----------
-        generator : `torch.data.DataLoader` or generator
+        generator : `torch.utils.data.DataLoader` or types.GeneratorType
             Generator loader yielding tuples (predictors, dependent) variables
 
         Returns
@@ -415,7 +473,7 @@ class ModelTrainer(object):
 
 def __example():
     from sklearn.datasets import load_iris
-    from torch.nn.functional import nll_loss, relu, log_softmax, cross_entropy
+    from torch.nn.functional import relu, log_softmax, cross_entropy
     X, y = load_iris(True)
 
     class Net(nn.Module):
@@ -432,7 +490,7 @@ def __example():
     model = Net()
     trainer = ModelTrainer(model)
     trainer.compile(cross_entropy, metrics=['acc'])
-    history = trainer.fit(X, y, val_data=(X, y), shuffle=True, batch_size=10, n_epoch=20)
+    history = trainer.fit(X, y, validation_data=(X, y), shuffle=True, batch_size=10, n_epoch=20, verbose=0)
     acc = trainer.evaluate(X, y, 200)
     y_pred = trainer.predict(X)
     print(history.bach_history)
