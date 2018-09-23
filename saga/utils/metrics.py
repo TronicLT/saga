@@ -157,13 +157,16 @@ class Accuracy(Metric):
     >>> y_true = np.array([0, 1, 2, 3])
     >>> accuracy_score(y_true, y_pred)
     0.5
-    >>> accuracy_score(np.array([[0, 1], [1, 1]]), np.ones((2, 2)))
+    >>> accuracy_score(np.array([[1, 0], [1, 1]]), np.ones((2, 2)))
     0.5
     >>> acc = Accuracy()
     >>> acc(torch.from_numpy(y_pred), torch.from_numpy(y_true)).numpy()
     array(0.5, dtype=float32)
-    >>> acc(torch.from_numpy(np.array([[0, 1], [1, 1]])), torch.ones((2, 2))).numpy()
+    >>> acc(torch.from_numpy(np.array([[1, 0], [1, 1]])), torch.ones((2, 2)).type(torch.LongTensor)).numpy()
     array(0.5, dtype=float32)
+    >>> acc = Accuracy(top_k=2)
+    >>> acc(torch.from_numpy(np.array([[1, 0], [1, 1]])), torch.ones((2, 2))).numpy()
+    array(1., dtype=float32)
     """
     def __init__(self, top_k=1, reduction='elementwise_mean'):
         super(Accuracy, self).__init__(reduction=reduction)
@@ -176,8 +179,9 @@ class Accuracy(Metric):
             if y_pred.dim() == y_true.dim() == 2:
                 y_true = torch.argmax(y_true, -1)
 
-            # TODO: Implement top-k accuracy
-            score = torch.argmax(y_pred, dim=-1).eq(y_true)
+            sorted_indices = torch.topk(y_pred, self.top_k, dim=1)[1]
+            expanded_y = y_true.view(-1, 1).expand(-1, self.top_k)
+            score = torch.sum(torch.eq(sorted_indices, expanded_y), dim=1)
 
         if self.reduction.lower() == 'none':
             return score.float()
