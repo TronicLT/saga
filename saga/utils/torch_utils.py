@@ -1,4 +1,5 @@
 # coding=utf8
+import torch
 from torch import optim
 from torch.nn import functional as func
 
@@ -9,7 +10,8 @@ __all__ = [
     'check_optimiser',
     'check_loss',
     'incremental_mean',
-    'moving_average'
+    'moving_average',
+    'one_hot'
 ]
 
 
@@ -134,3 +136,30 @@ def moving_average(x, val, alpha=0.9):
     Tensor, array-like, int or float
     """
     return x * alpha + (1. - alpha) * val
+
+
+def one_hot(x, n_classes):
+    """ One hot encoding
+
+    Parameters
+    ----------
+    x : `torch.Tensor`
+        A vector of values between 0 and n_classes - 1
+
+    n_classes : int
+        Number of classes in `x`
+
+    Examples
+    --------
+    >>> import numpy as np
+    >>> x = torch.from_numpy(np.array([1, 2, 0]))
+    >>> one_hot(x, 3)
+    tensor([[0., 1., 0.],
+            [0., 0., 1.],
+            [1., 0., 0.]])
+
+    Returns
+    -------
+    `torch.Tensor`
+    """
+    return torch.eye(n_classes)[x.type(torch.LongTensor)]
