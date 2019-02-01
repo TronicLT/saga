@@ -79,6 +79,24 @@ class Metric(object):
     def name(self):
         return self.__class__.__name__.lower()
 
+    def score_reduction(self, score):
+        """
+
+        Parameters
+        ----------
+        score
+
+        Returns
+        -------
+
+        """
+        if self.reduction.lower() == 'none':
+            return score.float()
+        elif self.reduction.lower() == 'sum':
+            return score.float().sum()
+        else:
+            return score.float().sum() / len(score)
+
 
 class NLL(Metric):
     """ The negative log likelihood loss. It is useful to train a classification
@@ -183,12 +201,7 @@ class Accuracy(Metric):
             expanded_y = y_true.view(-1, 1).expand(-1, self.top_k)
             score = torch.sum(torch.eq(sorted_indices, expanded_y), dim=1)
 
-        if self.reduction.lower() == 'none':
-            return score.float()
-        elif self.reduction.lower() == 'sum':
-            return score.float().sum()
-        else:
-            return score.float().sum() / len(score)
+        return self.score_reduction(score)
 
     @property
     def name(self):
@@ -261,12 +274,8 @@ class MSE(Metric):
         else:
             score = func.mse_loss(y_pred, y_true, None)
             score = score * self.weight
-            if self.reduction.lower() == 'none':
-                return score.float()
-            elif self.reduction.lower() == 'sum':
-                return score.float().sum()
-            else:
-                return score.float().sum() / len(score)
+
+        return self.score_reduction(score)
 
 
 class RMSE(Metric):
