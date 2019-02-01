@@ -17,7 +17,7 @@ __all__ = [
 
 
 class ModelTrainer(object):
-    """Pytorch model trainer based on Keras like interface
+    """PyTorch model trainer based on Keras interface
 
     Parameters
     ----------
@@ -39,10 +39,12 @@ class ModelTrainer(object):
 
     @property
     def loss(self):
+        """Get model loss"""
         return None if not hasattr(self, 'loss_') else self.loss_
 
     @property
     def device(self):
+        """Get model device"""
         return self.device_
 
     @device.setter
@@ -70,6 +72,12 @@ class ModelTrainer(object):
 
     @property
     def history(self):
+        """Get model training history
+
+        Returns
+        -------
+        `saga.utils.callbacks.History`
+        """
         return self.history_
 
     @loss.setter
@@ -80,19 +88,27 @@ class ModelTrainer(object):
         ----------
         loss: str or callable
             Model loss
-
-        Returns
-        -------
-        None
         """
         self.loss_ = check_loss(loss)
 
     @property
     def optimiser(self):
+        """ Get model optimiser
+
+        Returns
+        -------
+        torch.optim.Optimizer
+        """
         return None if not hasattr(self, 'optimiser_') else self.optimiser_
 
     @property
     def metrics(self):
+        """ Get model metrics
+
+        Returns
+        -------
+        iterable
+        """
         return list() if not hasattr(self, 'metrics_') else self.metrics_
 
     def set_loss(self, loss):
@@ -102,14 +118,17 @@ class ModelTrainer(object):
         ----------
         loss: str or callable
             Model loss
-
-        Returns
-        -------
-        None
         """
         self.loss = loss
 
     def set_metrics(self, metrics):
+        """ Set model training
+
+        Parameters
+        ----------
+        metrics : None or iterable (of str or `saga.utils.metrics.Metric`)
+            Model evaluation metrics
+        """
         metrics = metrics or list()
         self.metrics_ = [self.loss]
         self.metrics_names_ = ['loss']
@@ -118,6 +137,16 @@ class ModelTrainer(object):
             self.metrics_names_.append(self.metrics_[-1].name)
 
     def set_optimizer(self, optimizer, **kwargs):
+        """ Set model optimiser
+
+        Parameters
+        ----------
+        optimizer : str or torch.optim.Optimizer
+            Model optimiser
+
+        kwargs
+            Optimiser parameters
+        """
         if 'parameters' in kwargs:
             parameters = kwargs['parameters']
         else:
@@ -131,7 +160,7 @@ class ModelTrainer(object):
         Parameters
         ----------
         callbacks : iterable
-            List of 'utils.callbacks.Callback`
+            List of 'saga.utils.callbacks.Callback`
 
         Returns
         -------
@@ -152,13 +181,36 @@ class ModelTrainer(object):
         return self
 
     def compile(self, loss, optimizer='adam', metrics=None, loss_kwargs=None):
+        """ Set model loss, optimizer and metrics
+
+        Parameters
+        ----------
+        loss : str or callable
+            Model loss
+
+        optimizer : str or torch.optim.Optimizer
+            Model optimiser
+
+        metrics : None or iterable (of str or `saga.utils.metrics.Metric`)
+            Model evaluation metrics
+
+        loss_kwargs :  None or dict
+            Dict of values to pass to the loss function
+
+        Returns
+        -------
+        self
+        """
         self.set_optimizer(optimizer)
         self.set_loss(loss)
         self.set_metrics(metrics)
         self.loss_kwargs_ = {'reduction': 'elementwise_mean'} if loss_kwargs is None else loss_kwargs
 
+        return self
+
     @staticmethod
     def __get_data_loader(x, y=None, batch_size=32, shuffle=False, num_workers=0):
+        """Convert array data to PyTorch's data generator"""
         return data.DataLoader(ArrayDataset(x, y),
                                batch_size=batch_size,
                                shuffle=shuffle,
@@ -166,6 +218,7 @@ class ModelTrainer(object):
 
     @staticmethod
     def __validation_loader(x, y=None, batch_size=32, num_workers=0):
+        """Convert array data to PyTorch's data generator"""
         return data.DataLoader(ArrayDataset(x, y),
                                batch_size=batch_size,
                                shuffle=False,
@@ -361,6 +414,7 @@ class ModelTrainer(object):
         generator = self.__validation_loader(x, batch_size=batch_size, num_workers=0)
         return self.predict_generator(generator=generator, as_tensor=as_tensor)
 
+    @torch.no_grad()
     def predict_generator(self, generator, as_tensor=False):
         """ Run model inference on generator
 
@@ -378,16 +432,16 @@ class ModelTrainer(object):
         """
         self.model.eval()
         x_res = list()
-        with torch.no_grad():
-            for batch in generator:
-                if isinstance(batch, (list, tuple)):
-                    x_res.append(self.model.forward(batch[0].to(self.device)))
-                else:
-                    x_res.append(self.model.forward(batch.to(self.device)))
+        for batch in generator:
+            if isinstance(batch, (list, tuple)):
+                x_res.append(self.model.forward(batch[0].to(self.device)))
+            else:
+                x_res.append(self.model.forward(batch.to(self.device)))
 
         x_res = torch.cat(x_res, 0)
         return x_res if as_tensor else x_res.cpu().numpy()
 
+    @torch.no_grad()
     def predict_tensor(self, x):
         """ Run model inference on tensor
 
@@ -401,8 +455,7 @@ class ModelTrainer(object):
         `torch.tensor`
         """
         self.model.eval()
-        with torch.no_grad():
-            return self.model.forward(x.to(self.device))
+        return self.model.forward(x.to(self.device))
 
     def evaluate(self, x, y, batch_size=32):
         """ Evaluate the model on data `x` and `y`
@@ -425,6 +478,7 @@ class ModelTrainer(object):
         generator = self.__validation_loader(x, y, batch_size, num_workers=0)
         return self.evaluate_generator(generator=generator)
 
+    @torch.no_grad()
     def evaluate_generator(self, generator):
         """ Evaluate model on generator
 
@@ -439,16 +493,16 @@ class ModelTrainer(object):
         """
         self.model.eval()
         x_res, y_res = list(), list()
-        with torch.no_grad():
-            for x_bach, y_batch in generator:
-                x_res.append(self.model.forward(x_bach.to(self.device)))
-                y_res.append(y_batch.to(self.device))
+        for x_bach, y_batch in generator:
+            x_res.append(self.model.forward(x_bach.to(self.device)))
+            y_res.append(y_batch.to(self.device))
 
         x_res = torch.cat(x_res, 0)
         y_res = torch.cat(y_res, 0)
         res = [met(x_res, y_res).item() for met in self.metrics_]
         return res[0] if len(res) == 1 else res
 
+    @torch.no_grad()
     def evaluate_tensor(self, x, y):
         """ Evaluate model using on tensor
 
@@ -465,10 +519,9 @@ class ModelTrainer(object):
         `torch.tensor`
         """
         self.model.eval()
-        with torch.no_grad():
-            y_pred = self.model.forward(x.to(self.device))
-            res = [met(y_pred, y.to(self.device)).item() for met in self.metrics_]
-            return res[0] if len(res) == 1 else res
+        y_pred = self.model.forward(x.to(self.device))
+        res = [met(y_pred, y.to(self.device)).item() for met in self.metrics_]
+        return res[0] if len(res) == 1 else res
 
 
 def __example():
@@ -490,7 +543,7 @@ def __example():
     model = Net()
     trainer = ModelTrainer(model)
     trainer.compile(cross_entropy, metrics=['acc'])
-    history = trainer.fit(X, y, validation_data=(X, y), shuffle=True, batch_size=10, n_epoch=20, verbose=0)
+    history = trainer.fit(X, y, validation_data=(X, y), shuffle=True, batch_size=10, n_epoch=20, verbose=1)
     acc = trainer.evaluate(X, y, 200)
     y_pred = trainer.predict(X)
     print(history.bach_history)
