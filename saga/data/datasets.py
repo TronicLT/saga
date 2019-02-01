@@ -17,7 +17,7 @@ class ArrayDataset(Dataset):
 
     Parameters
     ----------
-    X : array-like, shape=(n_samples, ...)
+    x : array-like, shape=(n_samples, ...)
         Predictor variable
 
     y : array-like, shape=(n_samples, ...)
@@ -52,13 +52,13 @@ class ArrayDataset(Dataset):
     [0. 1.]
     [2. 3.]
     """
-    def __init__(self, X, y=None, transform=None, target_transform=None, is_image=False):
-        self.X = X.astype('float32')
+    def __init__(self, x, y=None, transform=None, target_transform=None, is_image=False):
+        self.x = x.astype('float32')
         self.y = y
-        self.is_image = False
+        self.is_image = is_image
         self.transform = transform
         self.target_transform = target_transform
-        self.n_samples = check_num_samples(X, y)
+        self.n_samples = check_num_samples(x, y)
         self.has_target = False if y is None else True
 
     def __transform(self, x, y):
@@ -78,20 +78,20 @@ class ArrayDataset(Dataset):
 
     def __getitem__(self, index):
         if self.has_target:
-            return self.__transform(self.X[index], self.y[index])
+            return self.__transform(self.x[index], self.y[index])
         else:
-            return self.__transform(self.X[index], self.y)
+            return self.__transform(self.x[index], self.y)
 
     def __len__(self):
         return self.n_samples
 
 
-def check_num_samples(X, y=None):
+def check_num_samples(x, y=None):
     """ Array samples validation
 
     Parameters
     ----------
-    X : array-like, shape=(n_samples, ...)
+    x : array-like, shape=(n_samples, ...)
         Predictor variable
 
     y : array-like, shape=(n_samples, ...)
@@ -101,10 +101,10 @@ def check_num_samples(X, y=None):
     -------
     int
     """
-    if isinstance(X, (list, tuple, np.generic, np.ndarray)):
-        x_samples = len(X)
+    if isinstance(x, (list, tuple, np.generic, np.ndarray)):
+        x_samples = len(x)
     else:
-        raise TypeError('Predictor variable must be an array-like object. {0} given'.format(type(X)))
+        raise TypeError('Predictor variable must be an array-like object. {0} given'.format(type(x)))
 
     if y is not None:
         if isinstance(y, (list, tuple, np.generic, np.ndarray)):
